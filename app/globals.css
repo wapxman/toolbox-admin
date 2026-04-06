@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { font-family: 'Inter', -apple-system, sans-serif; }
+
+.sidebar-link {
+  @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors;
+}
+.sidebar-link:hover { @apply bg-white/10; }
+.sidebar-link.active { @apply bg-brand text-white; }
+
+.stat-card {
+  @apply bg-white rounded-xl border border-gray-100 p-5 hover:shadow-md transition-shadow;
+}
+
+.table-row {
+  @apply border-b border-gray-50 hover:bg-gray-50/50 transition-colors;
+}
+
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+}
+.badge-green { @apply bg-emerald-50 text-emerald-700; }
+.badge-red { @apply bg-red-50 text-red-700; }
+.badge-blue { @apply bg-blue-50 text-blue-700; }
+.badge-yellow { @apply bg-amber-50 text-amber-700; }
+.badge-gray { @apply bg-gray-100 text-gray-600; }
+
+.btn-primary {
+  @apply bg-brand hover:bg-brand-dark text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors;
+}
+.btn-secondary {
+  @apply bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors;
+}
+.btn-danger {
+  @apply bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors;
+}
+
+.input {
+  @apply w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-colors;
+}
