@@ -1,59 +1,48 @@
 'use client';
-
-const users = [
-  { id: 1, phone: '+998 90 123 45 67', name: 'Бахтиёр Т.', rentals: 5, spent: 960000, joined: '3 апр 2026', status: 'active' },
-  { id: 2, phone: '+998 91 987 65 43', name: 'Алишер М.', rentals: 2, spent: 240000, joined: '5 апр 2026', status: 'active' },
-  { id: 3, phone: '+998 93 111 22 33', name: 'Дильшод К.', rentals: 8, spent: 1520000, joined: '1 апр 2026', status: 'active' },
-  { id: 4, phone: '+998 90 555 66 77', name: 'Рустам А.', rentals: 1, spent: 160000, joined: '4 апр 2026', status: 'blocked' },
-  { id: 5, phone: '+998 94 444 33 22', name: 'Нодир Х.', rentals: 3, spent: 480000, joined: '2 апр 2026', status: 'active' },
-];
+import { useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabase';
 
 export default function UsersPage() {
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => { loadUsers(); }, []);
+
+  async function loadUsers() {
+    const { data } = await supabase.from('users').select('*').order('created_at', { ascending: false });
+    setUsers(data || []);
+    setLoading(false);
+  }
+
+  async function toggleBlock(id: string, blocked: boolean) {
+    await supabase.from('users').update({ is_blocked: !blocked }).eq('id', id);
+    loadUsers();
+  }
+
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="text-gray-400">\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430...</div></div>;
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Пользователи</h2>
-          <p className="text-sm text-gray-500 mt-1">{users.length} пользователей</p>
-        </div>
-        <input type="text" placeholder="Поиск по номеру..." className="input max-w-xs" />
-      </div>
-
+      <div><h2 className="text-2xl font-bold text-gray-900">\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0438</h2>
+        <p className="text-sm text-gray-500 mt-1">{users.length} \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0435\u0439</p></div>
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50/50">
-              <th className="px-5 py-3">Телефон</th>
-              <th className="px-5 py-3">Имя</th>
-              <th className="px-5 py-3">Аренды</th>
-              <th className="px-5 py-3">Потрачено</th>
-              <th className="px-5 py-3">Дата регистрации</th>
-              <th className="px-5 py-3">Статус</th>
-              <th className="px-5 py-3">Действия</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
+        {users.length === 0 ? <div className="p-8 text-center text-gray-400">\u041d\u0435\u0442 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0435\u0439</div> : (
+          <table className="w-full"><thead><tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+            <th className="px-5 py-3">\u0418\u043c\u044f</th><th className="px-5 py-3">\u0422\u0435\u043b\u0435\u0444\u043e\u043d</th>
+            <th className="px-5 py-3">\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f</th><th className="px-5 py-3">\u0421\u0442\u0430\u0442\u0443\u0441</th><th className="px-5 py-3">\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044f</th>
+          </tr></thead><tbody>
+            {users.map((u: any) => (
               <tr key={u.id} className="table-row">
-                <td className="px-5 py-3 text-sm font-medium">{u.phone}</td>
-                <td className="px-5 py-3 text-sm">{u.name}</td>
-                <td className="px-5 py-3 text-sm text-gray-500">{u.rentals}</td>
-                <td className="px-5 py-3 text-sm font-medium">{u.spent.toLocaleString()} сўм</td>
-                <td className="px-5 py-3 text-sm text-gray-500">{u.joined}</td>
-                <td className="px-5 py-3">
-                  <span className={`badge ${u.status === 'active' ? 'badge-green' : 'badge-red'}`}>
-                    {u.status === 'active' ? 'Активен' : 'Заблокирован'}
-                  </span>
-                </td>
-                <td className="px-5 py-3">
-                  <button className={`text-xs font-medium ${u.status === 'active' ? 'text-red-500 hover:underline' : 'text-brand hover:underline'}`}>
-                    {u.status === 'active' ? 'Блокировать' : 'Разблокировать'}
-                  </button>
-                </td>
+                <td className="px-5 py-3 text-sm font-medium">{u.name}</td>
+                <td className="px-5 py-3 text-sm">{u.phone}</td>
+                <td className="px-5 py-3 text-sm text-gray-500">{new Date(u.created_at).toLocaleDateString('ru-RU')}</td>
+                <td className="px-5 py-3"><span className={`badge ${u.is_blocked?'badge-red':'badge-green'}`}>{u.is_blocked?'\u0417\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d':'\u0410\u043a\u0442\u0438\u0432\u0435\u043d'}</span></td>
+                <td className="px-5 py-3"><button onClick={() => toggleBlock(u.id, u.is_blocked)} className="text-xs text-gray-500 hover:text-gray-700">
+                  {u.is_blocked?'\u0420\u0430\u0437\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u0442\u044c':'\u0417\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u0442\u044c'}</button></td>
               </tr>
             ))}
-          </tbody>
-        </table>
+          </tbody></table>
+        )}
       </div>
     </div>
   );
