@@ -1,6 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://zwzmcihwtwgjajjjsbms.supabase.co';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3em1jaWh3dHdnamFqampzYm1zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0OTQ0MzksImV4cCI6MjA5MTA3MDQzOX0.X4UnLTta5Pm70sOwZkwJgvA8EkQtJPDmsn-2dMlkqjA';
+// Клиент админки ходит НЕ напрямую в Supabase, а через серверный прокси /api/db,
+// который подставляет секретный ключ на сервере (в обход RLS). Так секретный ключ
+// не попадает в браузер, а публичный anon-ключ больше не нужен.
+function proxyUrl() {
+  if (typeof window !== 'undefined') return `${window.location.origin}/api/db`;
+  // на сервере/сборке — заглушка (реальные запросы идут из браузера)
+  const site = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  return `${site}/api/db`;
+}
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// ключ-заглушка: прокси всё равно перезапишет его серверным секретом
+export const supabase = createClient(proxyUrl(), 'proxy');
