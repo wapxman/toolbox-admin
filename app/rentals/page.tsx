@@ -32,8 +32,8 @@ export default function RentalsPage() {
                 <td className="px-5 py-3 text-sm font-medium">{r.tools?.name || '—'}<br/><span className="text-xs text-gray-400">{r.tools?.brand}</span></td>
                 <td className="px-5 py-3 text-sm">{r.days}</td>
                 <td className="px-5 py-3 text-sm font-medium">{r.total_price?.toLocaleString()} сўм</td>
-                <td className="px-5 py-3"><span className={`badge ${r.status==='active'?'badge-blue':r.status==='completed'?'badge-green':'badge-red'}`}>
-                  {r.status==='active'?'Активна':r.status==='completed'?'Завершена':'Просрочена'}</span></td>
+                <td className="px-5 py-3"><span className={`badge ${r.status==='active'?'badge-blue':r.status==='completed'?'badge-green':r.status==='pending_payment'?'badge-yellow':r.status==='cancelled'?'badge-gray':'badge-red'}`}>
+                  {r.status==='active'?'Активна':r.status==='completed'?'Завершена':r.status==='pending_payment'?'Ждёт оплаты':r.status==='cancelled'?'Отменена':'Просрочена'}</span></td>
               </tr>
             ))}
           </tbody></table>
