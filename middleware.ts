@@ -23,10 +23,13 @@ export function middleware(req: NextRequest) {
 
   return new NextResponse('Требуется авторизация', {
     status: 401,
-    headers: { 'WWW-Authenticate': 'Basic realm="ToolBox Admin"' },
+    headers: { 'WWW-Authenticate': 'Basic realm="Taketool Admin"' },
   });
 }
 
+// Прокси /api/db исключён: supabase-js из браузера ставит свой Authorization-заголовок,
+// который затирает Basic-auth пароль → middleware отбивал data-запросы с 401 и таблицы
+// были пустыми. Секретный ключ всё равно живёт на сервере, страницы остаются под паролем.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/).*)'],
 };

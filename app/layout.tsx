@@ -25,7 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-brand flex items-center justify-center text-white font-bold text-lg">T</div>
                 <div>
-                  <div className="font-semibold text-sm">ToolBox</div>
+                  <div className="font-semibold text-sm">Taketool</div>
                   <div className="text-xs text-gray-400">Админ-панель</div>
                 </div>
               </div>
@@ -44,7 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <div className="w-8 h-8 rounded-full bg-brand/20 flex items-center justify-center text-brand text-xs font-bold">А</div>
                 <div>
                   <div className="text-sm font-medium">Админ</div>
-                  <div className="text-xs text-gray-500">admin@toolbox.uz</div>
+                  <div className="text-xs text-gray-500">admin@taketool.uz</div>
                 </div>
               </div>
             </div>
@@ -55,7 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <header className="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between sticky top-0 z-10">
               <div>
                 <h1 className="text-lg font-semibold text-gray-900">
-                  {nav.find(n => n.href === pathname)?.label || 'ToolBox Admin'}
+                  {nav.find(n => n.href === pathname)?.label || 'Taketool Admin'}
                 </h1>
               </div>
               <div className="flex items-center gap-3">

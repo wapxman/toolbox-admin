@@ -85,7 +85,7 @@ export default function BoxesPage() {
             <h3 className="text-lg font-semibold">Добавить бокс</h3>
             <div className="space-y-3">
               <div><label className="text-sm font-medium text-gray-700 mb-1 block">Название</label>
-                <input className="input" placeholder="ToolBox #2" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} /></div>
+                <input className="input" placeholder="Taketool #2" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} /></div>
               <div><label className="text-sm font-medium text-gray-700 mb-1 block">Адрес</label>
                 <input className="input" placeholder="ТЦ ..., этаж" value={form.address} onChange={e=>setForm({...form,address:e.target.value})} /></div>
               <div className="grid grid-cols-2 gap-3">
