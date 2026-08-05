@@ -58,12 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   {nav.find(n => n.href === pathname)?.label || 'Taketool Admin'}
                 </h1>
               </div>
-              <div className="flex items-center gap-3">
-                <button className="relative p-2 text-gray-400 hover:text-gray-600 transition">
-                  🔔
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-white text-[10px] flex items-center justify-center">3</span>
-                </button>
-              </div>
+              <div className="flex items-center gap-3" />
             </header>
             <div className="p-8">
               {children}

@@ -1,7 +1,12 @@
 // Серверный прокси к Supabase REST.
 // Клиент админки (supabase-js) шлёт запросы сюда, а мы форвардим их в Supabase
 // с СЕКРЕТНЫМ ключом (в обход RLS). Ключ живёт только на сервере, в браузер не попадает.
+//
+// Доступ — только с cookie, которую middleware ставит после успешного Basic-входа.
+// Раньше прокси был открыт всем (исключён из middleware) — любой, кто дотянулся
+// до порта, мог читать/писать всю базу service-ролью.
 import { NextRequest } from 'next/server';
+import { createHash } from 'crypto';
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL ||
@@ -15,7 +20,21 @@ const FWD_REQ = ['content-type', 'accept', 'prefer', 'range', 'range-unit'];
 // заголовки ответа, которые нужно вернуть клиенту
 const FWD_RESP = ['content-type', 'content-range', 'range-unit'];
 
+function isAuthorized(req: NextRequest): boolean {
+  const PASS = (process.env.ADMIN_PASSWORD || '').trim();
+  // Пароль не задан — ведём себя как middleware (не запираем до настройки env).
+  if (!PASS) return true;
+  const expected = createHash('sha256').update(`taketool:${PASS}`, 'utf8').digest('hex');
+  return req.cookies.get('taketool_admin')?.value === expected;
+}
+
 async function proxy(req: NextRequest, ctx: { params: { path: string[] } }) {
+  if (!isAuthorized(req)) {
+    return new Response(JSON.stringify({ error: 'Требуется авторизация' }), {
+      status: 401,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
   if (!SECRET) {
     return new Response(
       JSON.stringify({ error: 'SUPABASE_SECRET_KEY не задан на сервере админки' }),

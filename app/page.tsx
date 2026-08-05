@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({ boxes: 0, tools: 0, users: 0, activeRentals: 0 });
+  const [stats, setStats] = useState({ boxes: 0, tools: 0, users: 0, activeRentals: 0, revenueToday: 0, revenueWeek: 0 });
   const [boxes, setBoxes] = useState<any[]>([]);
   const [rentals, setRentals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -11,20 +11,31 @@ export default function Dashboard() {
   useEffect(() => { loadData(); }, []);
 
   async function loadData() {
-    const [boxRes, toolRes, userRes, activeRes, recentRes] = await Promise.all([
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - 7);
+
+    const [boxRes, toolRes, userRes, activeRes, recentRes, payWeekRes] = await Promise.all([
       supabase.from('boxes').select('*'),
       supabase.from('tools').select('*', { count: 'exact', head: true }),
       supabase.from('users').select('*', { count: 'exact', head: true }),
       supabase.from('rentals').select('*', { count: 'exact', head: true }).in('status', ['active', 'overdue']),
       supabase.from('rentals').select('*, tools(name), users(phone)').order('created_at', { ascending: false }).limit(10),
+      // Выручка — из журнала успешных платежей (Payme + Click)
+      supabase.from('transactions').select('amount, created_at')
+        .eq('status', 'success').gte('created_at', weekStart.toISOString()),
     ]);
     setBoxes(boxRes.data || []);
     setRentals(recentRes.data || []);
+    const payments = payWeekRes.data || [];
     setStats({
       boxes: boxRes.data?.length || 0,
       tools: toolRes.count || 0,
       users: userRes.count || 0,
       activeRentals: activeRes.count || 0,
+      revenueWeek: payments.reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0),
+      revenueToday: payments
+        .filter((p: any) => new Date(p.created_at) >= todayStart)
+        .reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0),
     });
     setLoading(false);
   }
@@ -36,6 +47,8 @@ export default function Dashboard() {
     { label: 'Инструменты', value: stats.tools, icon: '🔧' },
     { label: 'Пользователи', value: stats.users, icon: '👥' },
     { label: 'Активные аренды', value: stats.activeRentals, icon: '📋' },
+    { label: 'Выручка сегодня', value: `${stats.revenueToday.toLocaleString()} сўм`, icon: '💰' },
+    { label: 'Выручка за 7 дней', value: `${stats.revenueWeek.toLocaleString()} сўм`, icon: '📈' },
   ];
 
   return (
@@ -43,7 +56,7 @@ export default function Dashboard() {
       <div><h2 className="text-2xl font-bold text-gray-900">Обзор</h2>
         <p className="text-sm text-gray-500 mt-1">Статистика и управление Taketool</p></div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         {statCards.map((s, i) => (
           <div key={i} className="stat-card">
             <span className="text-2xl mb-2 block">{s.icon}</span>
