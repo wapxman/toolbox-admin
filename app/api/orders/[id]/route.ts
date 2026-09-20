@@ -13,6 +13,24 @@ function isAuthorized(req: NextRequest): boolean {
   return req.cookies.get('taketool_admin')?.value === expected;
 }
 
+// GET /api/orders/health — публичная самопроверка связки админка → бэкенд.
+// Значение секрета не раскрывает: только «задан ли» и «принимает ли его бэкенд»
+// (бэкенд с верным секретом отвечает «Заказ не найден», с неверным — «Not found»).
+export async function GET(req: NextRequest, ctx: { params: { id: string } }) {
+  if (ctx.params.id !== 'health') return Response.json({ error: 'Not found' }, { status: 404 });
+  const secret = process.env.ADMIN_API_SECRET || '';
+  if (!secret) return Response.json({ secret_configured: false, backend_accepts_secret: false });
+  try {
+    const resp = await fetch(`${BACKEND}/api/admin/orders/00000000-0000-0000-0000-000000000000`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': secret }, body: '{"action":"noop"}',
+    });
+    const j = await resp.json().catch(() => ({}));
+    return Response.json({ secret_configured: true, backend_accepts_secret: j?.error === 'Заказ не найден', backend_status: resp.status });
+  } catch (e: any) {
+    return Response.json({ secret_configured: true, backend_accepts_secret: false, error: e.message }, { status: 502 });
+  }
+}
+
 export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
   if (!isAuthorized(req)) {
     return Response.json({ error: 'Требуется авторизация' }, { status: 401 });
