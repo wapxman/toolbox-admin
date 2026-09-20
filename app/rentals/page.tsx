@@ -6,6 +6,7 @@ const STATUS_LABELS: Record<string, string> = {
   active: 'Активна',
   completed: 'Завершена',
   pending_payment: 'Ждёт оплаты',
+  pending_delivery: 'В доставке',
   cancelled: 'Отменена',
   overdue: 'Просрочена',
 };
@@ -14,6 +15,7 @@ const FILTERS = [
   { key: 'all', label: 'Все' },
   { key: 'active', label: 'Активные' },
   { key: 'pending_payment', label: 'Ждут оплаты' },
+  { key: 'pending_delivery', label: 'В доставке' },
   { key: 'overdue', label: 'Просроченные' },
   { key: 'completed', label: 'Завершённые' },
   { key: 'cancelled', label: 'Отменённые' },
@@ -23,6 +25,7 @@ function badgeClass(status: string) {
   return status === 'active' ? 'badge-blue'
     : status === 'completed' ? 'badge-green'
     : status === 'pending_payment' ? 'badge-yellow'
+    : status === 'pending_delivery' ? 'badge-blue'
     : status === 'cancelled' ? 'badge-gray'
     : 'badge-red';
 }
@@ -84,7 +87,7 @@ export default function RentalsPage() {
 
   return (
     <div className="space-y-6">
-      <div><h2 className="text-2xl font-bold text-gray-900">Аренды</h2>
+      <div><h2 className="text-2xl font-bold text-gray-900">Аренды и заказы</h2>
         <p className="text-sm text-gray-500 mt-1">{shown.length} из {rentals.length} аренд</p></div>
 
       {error && <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">Ошибка загрузки: {error}</div>}
@@ -105,7 +108,7 @@ export default function RentalsPage() {
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
         {shown.length === 0 ? <div className="p-8 text-center text-gray-400">Нет аренд</div> : (
           <table className="w-full"><thead><tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-            <th className="px-5 py-3">Пользователь</th><th className="px-5 py-3">Инструмент</th>
+            <th className="px-5 py-3">Пользователь</th><th className="px-5 py-3">Инструмент</th><th className="px-5 py-3">Тип</th>
             <th className="px-5 py-3">Бокс</th><th className="px-5 py-3">Срок</th>
             <th className="px-5 py-3">Сумма</th><th className="px-5 py-3">Статус</th><th className="px-5 py-3"></th>
           </tr></thead><tbody>
@@ -113,6 +116,8 @@ export default function RentalsPage() {
               <tr key={r.id} className="table-row">
                 <td className="px-5 py-3 text-sm">{r.users?.phone || '—'}<br/><span className="text-xs text-gray-400">{r.users?.name}</span></td>
                 <td className="px-5 py-3 text-sm font-medium">{r.tools?.name || '—'}<br/><span className="text-xs text-gray-400">{r.tools?.brand}</span></td>
+                <td className="px-5 py-3 text-sm">{r.kind === 'buy' ? 'Покупка' : r.kind === 'courier_return' ? 'Возврат курьером' : 'Аренда'}<br/>
+                  <span className="text-xs text-gray-400">{r.fulfillment === 'delivery' ? '🚚 доставка' : '📦 из бокса'}{r.order_number ? ` · №${r.order_number}` : ''}</span></td>
                 <td className="px-5 py-3 text-sm">{r.tools?.cells?.boxes?.name || '—'}<br/>
                   <span className="text-xs text-gray-400">{r.tools?.cells?.cell_number != null ? `ячейка ${r.tools.cells.cell_number}` : ''}</span></td>
                 <td className="px-5 py-3 text-sm">{fmtDate(r.started_at)} → {fmtDate(r.expected_end)}<br/>
