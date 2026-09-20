@@ -12,6 +12,7 @@ export default function SettingsPage() {
   const [pricing, setPricing] = useState<typeof DEFAULTS>(DEFAULTS);
   const [delivery, setDelivery] = useState<any>(DELIVERY_DEFAULTS);
   const [slotsText, setSlotsText] = useState('10:00-14:00, 14:00-18:00, 18:00-22:00');
+  const [support, setSupport] = useState<any>({ phone: '+998935236060', telegram: '', email: 'support@taketool.uz' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -25,6 +26,8 @@ export default function SettingsPage() {
       .from('app_settings').select('value').eq('key', 'pricing').maybeSingle();
     if (error) setError(`Ошибка загрузки: ${error.message}`);
     if (data?.value) setPricing({ ...DEFAULTS, ...data.value });
+    const { data: sup } = await supabase.from('app_settings').select('value').eq('key', 'support').maybeSingle();
+    if (sup?.value) setSupport({ phone: '', telegram: '', email: '', ...sup.value });
     const { data: d } = await supabase.from('app_settings').select('value').eq('key', 'delivery').maybeSingle();
     if (d?.value) {
       const v = { ...DELIVERY_DEFAULTS, ...d.value };
@@ -58,6 +61,16 @@ export default function SettingsPage() {
       .upsert({ key: 'delivery', value, updated_at: new Date().toISOString() });
     if (error) setError(`Ошибка сохранения: ${error.message}`);
     else setMsg('Доставка сохранена. Приложение увидит изменения в течение минуты.');
+    setSaving(false);
+  }
+
+  async function saveSupport() {
+    setSaving(true); setMsg(''); setError('');
+    const value = { phone: (support.phone || '').trim() || null, telegram: (support.telegram || '').trim() || null, email: (support.email || '').trim() || null };
+    const { error } = await supabase.from('app_settings')
+      .upsert({ key: 'support', value, updated_at: new Date().toISOString() });
+    if (error) setError(`Ошибка сохранения: ${error.message}`);
+    else setMsg('Контакты поддержки сохранены. Приложение подхватит в течение минуты.');
     setSaving(false);
   }
 
@@ -131,6 +144,28 @@ export default function SettingsPage() {
         <p className="text-xs text-gray-400">Одна цена на любую точку города — и за доставку, и за вызов курьера при возврате аренды.</p>
         <button onClick={saveDelivery} disabled={saving} className="btn-primary disabled:opacity-50">
           {saving ? 'Сохраняю…' : 'Сохранить доставку'}
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-4">
+        <h3 className="font-semibold text-gray-900 flex items-center gap-2">🛟 Поддержка</h3>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">Телефон</label>
+            <input className="input" value={support.phone || ''} onChange={(e) => setSupport({ ...support, phone: e.target.value })} placeholder="+998 93 523 60 60" />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">Telegram (ссылка или @ник)</label>
+            <input className="input" value={support.telegram || ''} onChange={(e) => setSupport({ ...support, telegram: e.target.value })} placeholder="https://t.me/taketool_support" />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">E-mail</label>
+            <input className="input" value={support.email || ''} onChange={(e) => setSupport({ ...support, email: e.target.value })} placeholder="support@taketool.uz" />
+          </div>
+        </div>
+        <p className="text-xs text-gray-400">Показываются в приложении: «О приложении», в заказе с доставкой и при просрочке. Пустое поле — кнопка не показывается.</p>
+        <button onClick={saveSupport} disabled={saving} className="btn-primary disabled:opacity-50">
+          {saving ? 'Сохраняю…' : 'Сохранить контакты'}
         </button>
       </div>
 

@@ -12,7 +12,7 @@ const CONDITIONS = [
 const emptyForm = {
   name: '', brand: '', category: '', day_price: '', condition: 'good',
   description: '', photo_url: '', box_id: '', cell_choice: '',
-  sale_price: '', sale_condition: '', sale_kit: '', sale_warranty: '',
+  sale_price: '', sale_stock: '0', sale_condition: '', sale_kit: '', sale_warranty: '',
 };
 
 export default function ToolsPage() {
@@ -55,7 +55,7 @@ export default function ToolsPage() {
       day_price: String(t.day_price ?? ''), condition: t.condition || 'good',
       description: t.description || '', photo_url: t.photo_url || '',
       box_id: t.cells?.boxes?.id || '', cell_choice: t.cells?.id || '',
-      sale_price: t.sale_price != null ? String(t.sale_price) : '', sale_condition: t.sale_condition || '',
+      sale_price: t.sale_price != null ? String(t.sale_price) : '', sale_stock: String(t.sale_stock ?? 0), sale_condition: t.sale_condition || '',
       sale_kit: t.sale_kit || '', sale_warranty: t.sale_warranty || '',
     });
     setError('');
@@ -91,6 +91,7 @@ export default function ToolsPage() {
         photo_url: form.photo_url.trim() || null,
         // Магазин: цена продажи пустая = инструмент только в аренду
         sale_price: parseInt(form.sale_price, 10) > 0 ? parseInt(form.sale_price, 10) : null,
+        sale_stock: Math.max(0, parseInt(form.sale_stock, 10) || 0),
         sale_condition: form.sale_condition.trim() || null,
         sale_kit: form.sale_kit.trim() || null,
         sale_warranty: form.sale_warranty.trim() || null,
@@ -167,7 +168,7 @@ export default function ToolsPage() {
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
         <table className="w-full"><thead><tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
           <th className="px-5 py-3">Название</th><th className="px-5 py-3">Бренд</th>
-          <th className="px-5 py-3">Категория</th><th className="px-5 py-3">Цена/день</th><th className="px-5 py-3">Цена продажи</th>
+          <th className="px-5 py-3">Категория</th><th className="px-5 py-3">Цена/день</th><th className="px-5 py-3">Продажа (новые)</th>
           <th className="px-5 py-3">Бокс</th><th className="px-5 py-3">Ячейка</th><th className="px-5 py-3">Статус</th>
           <th className="px-5 py-3 text-right">Действия</th>
         </tr></thead><tbody>
@@ -177,7 +178,7 @@ export default function ToolsPage() {
               <td className="px-5 py-3 text-sm text-gray-500">{t.brand || '—'}</td>
               <td className="px-5 py-3 text-sm text-gray-500">{t.category}</td>
               <td className="px-5 py-3 text-sm font-medium">{t.day_price?.toLocaleString()} сўм</td>
-              <td className="px-5 py-3 text-sm">{t.status === 'sold' ? <span className="badge badge-gray">Продан</span> : t.sale_price ? `${t.sale_price.toLocaleString()} сўм` : <span className="text-gray-400">только аренда</span>}</td>
+              <td className="px-5 py-3 text-sm">{t.sale_price ? <>{t.sale_price.toLocaleString()} сўм<br/><span className={`text-xs ${(t.sale_stock ?? 0) > 0 ? 'text-emerald-600' : 'text-red-500'}`}>на складе: {t.sale_stock ?? 0} шт.</span></> : <span className="text-gray-400">только аренда</span>}</td>
               <td className="px-5 py-3 text-sm text-gray-500">{t.cells?.boxes?.name || '—'}</td>
               <td className="px-5 py-3 text-sm">№{t.cells?.cell_number ?? '—'}</td>
               <td className="px-5 py-3"><span className={`badge ${t.cells?.status==='free'?'badge-green':'badge-red'}`}>
@@ -255,25 +256,30 @@ export default function ToolsPage() {
               )}
 
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
-                <div className="text-sm font-semibold text-gray-900">Продажа (магазин)</div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="text-sm font-semibold text-gray-900">Продажа новых единиц (магазин)</div>
+                <p className="text-xs text-gray-500">Продаём НОВЫЕ инструменты со склада, а не арендный экземпляр из ячейки. Кнопка «Купить» показывается, пока остаток больше нуля; остаток списывается при оплате.</p>
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Цена продажи (сум)</label>
                     <input className="input" type="number" value={form.sale_price} onChange={(e) => setForm({ ...form, sale_price: e.target.value })} placeholder="пусто — только аренда" />
                   </div>
                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">На складе (шт.)</label>
+                    <input className="input" type="number" min={0} value={form.sale_stock} onChange={(e) => setForm({ ...form, sale_stock: e.target.value })} />
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Гарантия</label>
-                    <input className="input" value={form.sale_warranty} onChange={(e) => setForm({ ...form, sale_warranty: e.target.value })} placeholder="14 дней на проверку" />
+                    <input className="input" value={form.sale_warranty} onChange={(e) => setForm({ ...form, sale_warranty: e.target.value })} placeholder="12 месяцев официальной гарантии" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Состояние для покупателя</label>
-                    <input className="input" value={form.sale_condition} onChange={(e) => setForm({ ...form, sale_condition: e.target.value })} placeholder="Хорошее, б/у из проката" />
+                    <input className="input" value={form.sale_condition} onChange={(e) => setForm({ ...form, sale_condition: e.target.value })} placeholder="Новый, в заводской упаковке" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Комплектация</label>
-                    <input className="input" value={form.sale_kit} onChange={(e) => setForm({ ...form, sale_kit: e.target.value })} placeholder="Кейс, 2 биты, зарядка" />
+                    <input className="input" value={form.sale_kit} onChange={(e) => setForm({ ...form, sale_kit: e.target.value })} placeholder="Заводская комплектация" />
                   </div>
                 </div>
               </div>
