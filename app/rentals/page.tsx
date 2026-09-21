@@ -16,6 +16,7 @@ const FILTERS = [
   { key: 'active', label: 'Активные' },
   { key: 'pending_payment', label: 'Ждут оплаты' },
   { key: 'pending_delivery', label: 'В доставке' },
+  { key: 'penalty', label: 'Штрафы' },
   { key: 'overdue', label: 'Просроченные' },
   { key: 'completed', label: 'Завершённые' },
   { key: 'cancelled', label: 'Отменённые' },
@@ -70,6 +71,17 @@ export default function RentalsPage() {
     loadRentals();
   }
 
+  // Аннулировать неоплаченный штраф (через бэкенд: уведомление клиенту, снятие блокировки)
+  async function waivePenalty(r: any) {
+    if (!confirm(`Списать штраф ${r.total_price?.toLocaleString()} сўм (${r.users?.phone})? Клиент снова сможет арендовать.`)) return;
+    setBusyId(r.id);
+    const resp = await fetch(`/api/orders/${r.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'waive_penalty' }) });
+    const j = await resp.json().catch(() => ({}));
+    if (!resp.ok) alert(`Ошибка: ${j.error || resp.status}`);
+    setBusyId(null);
+    loadRentals();
+  }
+
   // Отменить неоплаченную аренду. Ячейка не резервируется до оплаты — трогать её не нужно.
   async function cancelRental(r: any) {
     if (!confirm(`Отменить неоплаченную аренду «${r.tools?.name}»?`)) return;
@@ -83,7 +95,7 @@ export default function RentalsPage() {
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="text-gray-400">Загрузка...</div></div>;
 
-  const shown = filter === 'all' ? rentals : rentals.filter((r) => r.status === filter);
+  const shown = filter === 'all' ? rentals : filter === 'penalty' ? rentals.filter((r) => r.kind === 'penalty') : rentals.filter((r) => r.status === filter);
 
   return (
     <div className="space-y-6">
@@ -99,7 +111,7 @@ export default function RentalsPage() {
               filter === f.key ? 'bg-brand text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
             {f.label}
             <span className="ml-1.5 text-xs opacity-70">
-              {f.key === 'all' ? rentals.length : rentals.filter((r) => r.status === f.key).length}
+              {f.key === 'all' ? rentals.length : f.key === 'penalty' ? rentals.filter((r) => r.kind === 'penalty').length : rentals.filter((r) => r.status === f.key).length}
             </span>
           </button>
         ))}
@@ -116,7 +128,7 @@ export default function RentalsPage() {
               <tr key={r.id} className="table-row">
                 <td className="px-5 py-3 text-sm">{r.users?.phone || '—'}<br/><span className="text-xs text-gray-400">{r.users?.name}</span></td>
                 <td className="px-5 py-3 text-sm font-medium">{r.tools?.name || '—'}<br/><span className="text-xs text-gray-400">{r.tools?.brand}</span></td>
-                <td className="px-5 py-3 text-sm">{r.kind === 'buy' ? 'Покупка' : r.kind === 'courier_return' ? 'Возврат курьером' : 'Аренда'}<br/>
+                <td className="px-5 py-3 text-sm">{r.kind === 'buy' ? 'Покупка' : r.kind === 'courier_return' ? 'Возврат курьером' : r.kind === 'penalty' ? '⚠️ Штраф за просрочку' : 'Аренда'}<br/>
                   <span className="text-xs text-gray-400">{r.fulfillment === 'delivery' ? '🚚 доставка' : '📦 из бокса'}{r.order_number ? ` · №${r.order_number}` : ''}</span></td>
                 <td className="px-5 py-3 text-sm">{r.tools?.cells?.boxes?.name || '—'}<br/>
                   <span className="text-xs text-gray-400">{r.tools?.cells?.cell_number != null ? `ячейка ${r.tools.cells.cell_number}` : ''}</span></td>
@@ -131,7 +143,13 @@ export default function RentalsPage() {
                       Завершить
                     </button>
                   )}
-                  {r.status === 'pending_payment' && (
+                  {r.status === 'pending_payment' && r.kind === 'penalty' && (
+                    <button onClick={() => waivePenalty(r)} disabled={busyId === r.id}
+                      className="text-xs px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 font-medium disabled:opacity-50">
+                      Списать штраф
+                    </button>
+                  )}
+                  {r.status === 'pending_payment' && r.kind !== 'penalty' && (
                     <button onClick={() => cancelRental(r)} disabled={busyId === r.id}
                       className="text-xs px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 font-medium disabled:opacity-50">
                       Отменить
