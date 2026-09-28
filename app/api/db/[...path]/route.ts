@@ -22,8 +22,11 @@ const FWD_RESP = ['content-type', 'content-range', 'range-unit'];
 
 function isAuthorized(req: NextRequest): boolean {
   const PASS = (process.env.ADMIN_PASSWORD || '').trim();
-  // Пароль не задан — ведём себя как middleware (не запираем до настройки env).
-  if (!PASS) return true;
+  // Пароль не задан: локально не запираем себя до настройки env, а на проде
+  // ЗАКРЫВАЕМ. Этот прокси ходит в базу секретным ключом в обход RLS (телефоны
+  // клиентов, коды sms_codes, платежи — и на запись тоже), поэтому пустой env
+  // не должен означать «открыто всем».
+  if (!PASS) return !process.env.VERCEL;
   const expected = createHash('sha256').update(`taketool:${PASS}`, 'utf8').digest('hex');
   return req.cookies.get('taketool_admin')?.value === expected;
 }
