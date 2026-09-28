@@ -10,6 +10,7 @@ const nav = [
   { href: '/rentals', icon: '📋', label: 'Аренды и заказы' },
   { href: '/orders', icon: '🚚', label: 'Доставка' },
   { href: '/users', icon: '👥', label: 'Пользователи' },
+  { href: '/acquisition', icon: '📈', label: 'Привлечение' },
   { href: '/settings', icon: '⚙️', label: 'Настройки' },
 ];
 
