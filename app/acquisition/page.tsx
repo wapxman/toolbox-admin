@@ -148,12 +148,12 @@ export default function Acquisition() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Привлечение</h2>
           <p className="text-sm text-gray-500 mt-1">Откуда скачивают Taketool и что происходит дальше</p>
         </div>
-        <div className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1">
+        <div className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1 self-start">
           {[7, 30, 90].map((d) => (
             <button key={d} onClick={() => setDays(d)}
               className={`px-3 py-1.5 text-sm rounded-md transition ${days === d ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
@@ -170,7 +170,7 @@ export default function Acquisition() {
       )}
 
       {/* Воронка */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4">
         {funnel.map((f, i) => (
           <div key={i} className={`bg-white rounded-xl border p-5 ${f.solid ? 'border-gray-100' : 'border-dashed border-gray-300'}`}>
             <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Шаг {i + 1}</div>
@@ -212,16 +212,17 @@ export default function Acquisition() {
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
         {/* Каналы */}
-        <div className="col-span-2 bg-white rounded-xl border border-gray-100">
+        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 overflow-hidden">
           <div className="p-5 border-b border-gray-50">
             <h3 className="font-semibold text-gray-900">Каналы</h3>
           </div>
           {agg.channels.length === 0 ? (
             <div className="p-8 text-center text-gray-400">Пока ни одного клика</div>
           ) : (
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px]">
               <thead>
                 <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <th className="px-5 py-3">Источник / канал</th>
@@ -245,6 +246,7 @@ export default function Acquisition() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 
@@ -272,15 +274,15 @@ export default function Acquisition() {
             Одна ссылка на канал. Сама определяет Android/iPhone и уводит в нужный магазин, попутно считая клик.
           </p>
         </div>
-        <div className="p-4 grid grid-cols-2 gap-3">
+        <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
           {Object.entries(PRESETS).map(([key, p]) => {
             const url = `https://taketool.uz/dl/${key}`;
             const got = agg.channels.find((c) => c.name === `${p.source} / ${p.medium}`)?.clicks || 0;
             return (
               <div key={key} className="border border-gray-100 rounded-lg p-3 flex items-center justify-between gap-3">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium text-gray-900">{p.label}</div>
-                  <code className="text-xs text-gray-500 break-all">{url}</code>
+                  <code className="block text-xs text-gray-500 truncate">{url}</code>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs text-gray-400 whitespace-nowrap">{got} кл.</span>

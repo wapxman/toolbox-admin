@@ -21,8 +21,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ru">
       <body className="bg-gray-50">
         <div className="flex min-h-screen">
-          {/* Sidebar */}
-          <aside className="w-64 bg-gray-900 text-white flex flex-col fixed h-full">
+          {/* Боковое меню — только с планшета и шире. На телефоне оно съедало
+              две трети экрана, поэтому там вместо него полоса ссылок сверху. */}
+          <aside className="w-64 bg-gray-900 text-white hidden lg:flex flex-col fixed h-full">
             <div className="p-6 border-b border-white/10">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-brand flex items-center justify-center text-white font-bold text-lg">T</div>
@@ -53,16 +54,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </aside>
 
           {/* Main content */}
-          <main className="flex-1 ml-64">
-            <header className="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between sticky top-0 z-10">
-              <div>
-                <h1 className="text-lg font-semibold text-gray-900">
-                  {nav.find(n => n.href === pathname)?.label || 'Taketool Admin'}
-                </h1>
-              </div>
-              <div className="flex items-center gap-3" />
+          <main className="flex-1 lg:ml-64 min-w-0">
+            <header className="bg-white border-b border-gray-100 px-4 lg:px-8 py-4 sticky top-0 z-10">
+              <h1 className="text-lg font-semibold text-gray-900">
+                {nav.find(n => n.href === pathname)?.label || 'Taketool Admin'}
+              </h1>
+              {/* Мобильная навигация: горизонтальная прокрутка вместо боковой панели */}
+              <nav className="flex lg:hidden gap-2 mt-3 -mx-4 px-4 overflow-x-auto pb-1">
+                {nav.map((item) => (
+                  <Link key={item.href} href={item.href}
+                    className={`flex items-center gap-1.5 whitespace-nowrap text-sm px-3 py-1.5 rounded-lg border transition ${
+                      pathname === item.href
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'text-gray-600 border-gray-200'
+                    }`}>
+                    <span>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </Link>
+                ))}
+              </nav>
             </header>
-            <div className="p-8">
+            <div className="p-4 lg:p-8">
               {children}
             </div>
           </main>
