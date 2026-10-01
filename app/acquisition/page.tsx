@@ -126,7 +126,7 @@ export default function Acquisition() {
   const funnel = [
     { label: 'Клики по ссылкам', value: agg.total, note: `${agg.uniq} уникальных устройств`, solid: true },
     { label: 'Ушли в магазин', value: agg.toStore, note: `${pct(agg.toStore, agg.total)} от кликов`, solid: true },
-    { label: 'Установки', value: null, note: 'только в Play Console / App Store Connect', solid: false },
+    { label: 'Установки', value: null, note: 'Google отдаёт с задержкой 3–7 дней, Apple — 1–2', solid: false },
     { label: 'Регистрации', value: users, note: 'всего за период, без разбивки по каналам', solid: true },
     { label: 'Оплаченные заказы', value: orders, note: 'всего за период, без разбивки по каналам', solid: true },
   ];
@@ -169,11 +169,14 @@ export default function Acquisition() {
       </div>
 
       <div className="bg-blue-50 border border-blue-200 text-blue-900 text-sm rounded-lg px-4 py-3 leading-relaxed">
-        <b>Как читать воронку.</b> Клики и переходы в магазин — наши данные, точные и по каналам.
-        Установки Google и Apple по API не отдают: смотрите их в Play Console (Источники трафика,
-        разбивка по <code className="bg-blue-100 px-1 rounded">utm_source</code>) и в App Store Connect
-        (Аналитика → Кампании). Регистрации и заказы — из нашей базы, но пока это итог по всем каналам:
-        связать конкретную установку с каналом можно только через Install Referrer в приложении.
+        <b>Как читать воронку.</b> Клики и переходы в магазин — наши данные, точные и в реальном времени.
+        Установки магазины отдают, но с задержкой и файлами, а не живым счётчиком: Google выкладывает
+        CSV-отчёты в своё хранилище через <b>3–7 дней</b> (там есть разбивка по
+        <code className="bg-blue-100 px-1 rounded">utm_source</code>), Apple — через Analytics Reports API
+        за <b>1–2 дня</b>. Пока эти выгрузки не подключены, смотрите установки руками: Play Console →
+        Источники трафика, App Store Connect → Аналитика. Регистрации и заказы — из нашей базы, но пока
+        это итог по всем каналам: связать конкретную установку с каналом можно только через Install
+        Referrer в приложении.
       </div>
 
       {/* График по дням */}
