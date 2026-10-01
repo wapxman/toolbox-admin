@@ -29,25 +29,36 @@ const PRESETS: Record<string, { label: string; source: string; medium: string }>
   box: { label: 'QR — на боксе', source: 'qr', medium: 'offline' },
 };
 
-const ROW_LIMIT = 20000;
 const PLATFORM_LABEL: Record<string, string> = {
   android: 'Android', ios: 'iPhone', desktop: 'Компьютер', other: 'Прочее',
 };
 
-type Click = {
-  created_at: string; source: string; medium: string | null; campaign: string | null;
-  platform: string; target: string | null; country: string | null; city: string | null;
-  ip_hash: string | null;
+// Считает SQL-функция acquisition_stats(days_back) — см. миграцию
+// sms_log_and_acquisition_stats. Раньше страница выгружала сами клики и
+// складывала их в браузере, но Supabase REST отдаёт максимум 1000 строк на
+// запрос: всё, что выше 1000 кликов за период, молча пропадало (01.10.2026
+// панель показывала 1000 вместо 1667). Агрегат считается на сервере и лимита
+// строк не касается.
+type Channel = {
+  name: string; clicks: number; uniq: number;
+  android: number; ios: number; other: number;
 };
+type Stats = {
+  total: number; uniq: number; to_store: number;
+  channels: Channel[];
+  by_day: { day: string; source: string; clicks: number }[];
+  cities: { city: string; clicks: number }[];
+};
+const EMPTY_STATS: Stats = { total: 0, uniq: 0, to_store: 0, channels: [], by_day: [], cities: [] };
 
 export default function Acquisition() {
   const [days, setDays] = useState(30);
-  const [clicks, setClicks] = useState<Click[]>([]);
+  const [stats, setStats] = useState<Stats>(EMPTY_STATS);
   const [users, setUsers] = useState(0);
   const [orders, setOrders] = useState(0);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
-  const [truncated, setTruncated] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [days]);
 
@@ -55,55 +66,31 @@ export default function Acquisition() {
     setLoading(true);
     const since = new Date(Date.now() - days * 86400_000).toISOString();
 
-    const [clickRes, userRes, orderRes] = await Promise.all([
-      supabase.from('app_clicks')
-        .select('created_at,source,medium,campaign,platform,target,country,city,ip_hash')
-        .gte('created_at', since)
-        .order('created_at', { ascending: false })
-        .limit(ROW_LIMIT),
+    const [statsRes, userRes, orderRes] = await Promise.all([
+      supabase.rpc('acquisition_stats', { days_back: days }),
       supabase.from('users').select('*', { count: 'exact', head: true })
         .gte('created_at', since).is('deleted_at', null),
       supabase.from('rentals').select('*', { count: 'exact', head: true })
         .gte('created_at', since).not('paid_at', 'is', null),
     ]);
 
-    const rows = (clickRes.data || []) as Click[];
-    setClicks(rows);
-    setTruncated(rows.length >= ROW_LIMIT);
+    // Молча показать нули при сбое нельзя: это читается как «кликов нет».
+    setFailed(statsRes.error ? statsRes.error.message : null);
+    setStats((statsRes.data as Stats) || EMPTY_STATS);
     setUsers(userRes.count || 0);
     setOrders(orderRes.count || 0);
     setLoading(false);
   }
 
+  // Из агрегата собираем только то, что нужно графику: строка на день,
+  // в ней по колонке на источник (recharts складывает их в стопку).
   const agg = useMemo(() => {
-    const uniq = new Set<string>();
-    const byChannel = new Map<string, { clicks: number; uniq: Set<string>; android: number; ios: number; other: number }>();
+    const sources = Array.from(new Set(stats.by_day.map((r) => r.source)));
     const byDay = new Map<string, Record<string, number>>();
-    const byCity = new Map<string, number>();
-    let toStore = 0;
-
-    for (const c of clicks) {
-      if (c.ip_hash) uniq.add(c.ip_hash);
-      if (c.target === 'play' || c.target === 'appstore') toStore++;
-
-      const key = [c.source, c.medium || '—'].join(' / ');
-      if (!byChannel.has(key)) byChannel.set(key, { clicks: 0, uniq: new Set(), android: 0, ios: 0, other: 0 });
-      const ch = byChannel.get(key)!;
-      ch.clicks++;
-      if (c.ip_hash) ch.uniq.add(c.ip_hash);
-      if (c.platform === 'android') ch.android++;
-      else if (c.platform === 'ios') ch.ios++;
-      else ch.other++;
-
-      const day = new Date(c.created_at).toISOString().slice(0, 10);
-      if (!byDay.has(day)) byDay.set(day, {});
-      const d = byDay.get(day)!;
-      d[c.source] = (d[c.source] || 0) + 1;
-
-      if (c.city) byCity.set(c.city, (byCity.get(c.city) || 0) + 1);
+    for (const r of stats.by_day) {
+      if (!byDay.has(r.day)) byDay.set(r.day, {});
+      byDay.get(r.day)![r.source] = r.clicks;
     }
-
-    const sources = Array.from(new Set(clicks.map((c) => c.source)));
     const chart = Array.from(byDay.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([day, vals]) => ({
@@ -112,17 +99,15 @@ export default function Acquisition() {
       }));
 
     return {
-      total: clicks.length,
-      uniq: uniq.size,
-      toStore,
-      channels: Array.from(byChannel.entries())
-        .map(([name, v]) => ({ name, ...v, uniq: v.uniq.size }))
-        .sort((a, b) => b.clicks - a.clicks),
+      total: stats.total,
+      uniq: stats.uniq,
+      toStore: stats.to_store,
+      channels: stats.channels,
       chart,
       sources,
-      cities: Array.from(byCity.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6),
+      cities: stats.cities.slice(0, 6).map((c) => [c.city, c.clicks] as [string, number]),
     };
-  }, [clicks]);
+  }, [stats]);
 
   function copy(text: string, key: string) {
     navigator.clipboard?.writeText(text).then(() => {
@@ -163,9 +148,9 @@ export default function Acquisition() {
         </div>
       </div>
 
-      {truncated && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-lg px-4 py-3">
-          Показаны последние {ROW_LIMIT.toLocaleString()} кликов за период — данных больше, цифры ниже занижены.
+      {failed && (
+        <div className="bg-red-50 border border-red-200 text-red-900 text-sm rounded-lg px-4 py-3">
+          Не удалось посчитать статистику: {failed}. Цифры ниже — нули, а не «кликов нет».
         </div>
       )}
 
