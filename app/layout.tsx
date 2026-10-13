@@ -7,6 +7,7 @@ const nav = [
   { href: '/', icon: '📊', label: 'Дашборд' },
   { href: '/boxes', icon: '📦', label: 'Боксы' },
   { href: '/cells', icon: '🔓', label: 'Ячейки' },
+  { href: '/promo', icon: '🎡', label: 'Колесо Фортуны' },
   { href: '/tools', icon: '🔧', label: 'Инструменты' },
   { href: '/rentals', icon: '📋', label: 'Аренды и заказы' },
   { href: '/orders', icon: '🚚', label: 'Доставка' },
