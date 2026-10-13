@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 const nav = [
   { href: '/', icon: '📊', label: 'Дашборд' },
   { href: '/boxes', icon: '📦', label: 'Боксы' },
+  { href: '/cells', icon: '🔓', label: 'Ячейки' },
   { href: '/tools', icon: '🔧', label: 'Инструменты' },
   { href: '/rentals', icon: '📋', label: 'Аренды и заказы' },
   { href: '/orders', icon: '🚚', label: 'Доставка' },
