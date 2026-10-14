@@ -2,3 +2,7 @@ node_modules/
 .next/
 .env.local
 out/
+
+# логи локального сервера
+admin_prod.log
+*.log
