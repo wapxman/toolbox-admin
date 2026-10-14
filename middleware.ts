@@ -11,11 +11,13 @@
 // supabase-js затирает Basic-заголовок своим Authorization.
 //
 // ВАЖНО: /api/db ходит в Supabase СЕКРЕТНЫМ ключом в обход RLS — оттуда видны
-// телефоны клиентов, коды из sms_codes и платежи, причём на запись. Поэтому на
-// проде (VERCEL) при незаданных ADMIN_PASSWORD/ADMIN_TOKEN доступ ЗАКРЫВАЕТСЯ,
-// а не открывается: пустой env не должен выставлять базу наружу.
+// телефоны клиентов, коды из sms_codes и платежи, причём на запись. Поэтому в
+// боевой сборке при незаданных ADMIN_PASSWORD/ADMIN_TOKEN доступ ЗАКРЫВАЕТСЯ,
+// а не открывается: пустой env не должен выставлять базу наружу. Признак —
+// именно сборка (NODE_ENV), а не хостинг: раньше условием был Vercel, и та же
+// админка, поднятая в другом месте, пускала к базе без пароля.
 import { NextRequest, NextResponse } from 'next/server';
-import { issueSession, verifySession, SESSION_DAYS } from './lib/admin-auth';
+import { issueSession, verifySession, SESSION_DAYS, sessionSecret } from './lib/admin-auth';
 
 const AUTH_COOKIE = 'taketool_admin';
 // Срок сессии задаётся в lib/admin-auth: полгода — это не сессия, а пароль
@@ -44,11 +46,16 @@ function setPass(res: NextResponse, hash: string) {
 export async function middleware(req: NextRequest) {
   const PASS = (process.env.ADMIN_PASSWORD || '').trim();
   const TOKEN = (process.env.ADMIN_TOKEN || '').trim();
-  const onVercel = !!process.env.VERCEL;
+  // Чем подписываем сессию: пароль, а если его нет — токен. В режиме «только
+  // ссылка» пароля нет, и подпись пустой строкой verifySession отвергала —
+  // ссылка срабатывала один раз и переставала работать.
+  const SECRET = sessionSecret();
 
-  if (!PASS && !TOKEN) {
-    // Локально — не запираем себя до настройки env. На проде — наоборот, закрываем.
-    if (!onVercel) return NextResponse.next();
+  if (!SECRET) {
+    // ⚠️ Решаем по сборке, а не по хостингу: ненастроенная боевая админка
+    // обязана молчать, где бы её ни подняли. Для местной разработки оставляем
+    // открытой, чтобы не запирать себя до настройки env.
+    if (process.env.NODE_ENV !== 'production') return NextResponse.next();
     return new NextResponse(
       'Админка не настроена: не заданы ADMIN_PASSWORD и ADMIN_TOKEN.',
       { status: 503 },
@@ -56,7 +63,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // 1. Уже входили с этого устройства — проверяем подпись и срок сессии.
-  if (verifySession(req.cookies.get(AUTH_COOKIE)?.value, PASS)) return NextResponse.next();
+  if (verifySession(req.cookies.get(AUTH_COOKIE)?.value, SECRET)) return NextResponse.next();
 
   // 2. Ссылка-ключ: ?k=<токен> — ставим cookie и убираем токен из адреса,
   //    чтобы он не осел в истории браузера и в заголовке Referer.
@@ -65,7 +72,7 @@ export async function middleware(req: NextRequest) {
     const clean = req.nextUrl.clone();
     clean.searchParams.delete('k');
     const res = NextResponse.redirect(clean);
-    setPass(res, issueSession(PASS));
+    setPass(res, issueSession(SECRET));
     return res;
   }
 
@@ -78,7 +85,7 @@ export async function middleware(req: NextRequest) {
       const pass = decoded.slice(i + 1).trim(); // логин игнорируем, берём только пароль
       if (PASS && safeEqual(pass, PASS)) {
         const res = NextResponse.next();
-        setPass(res, issueSession(PASS));
+        setPass(res, issueSession(SECRET));
         return res;
       }
     } catch {

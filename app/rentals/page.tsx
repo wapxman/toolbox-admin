@@ -55,42 +55,49 @@ export default function RentalsPage() {
     setLoading(false);
   }
 
-  // Завершить аренду вручную (инструмент принят на месте): статус, дата, ячейка → free.
-  // Замок из админки не открываем — это делает точка/приложение.
-  async function closeRental(r: any) {
-    if (!confirm(`Завершить аренду «${r.tools?.name}» (${r.users?.phone})? Ячейка станет свободной.`)) return;
+  // Действия над заказом идут ТОЛЬКО через сервер.
+  //
+  // ⚠️ Раньше эта страница правила базу напрямую: сама ставила статусы и
+  // освобождала ячейки. Мимо проходили все правила — просрочка не считалась,
+  // штраф не выставлялся, списанный бонус не возвращался, неоплаченный счёт на
+  // продление оставался живым, а ноль изменённых строк выглядел как успех.
+  // Сервер делает это одним согласованным переходом и отвечает конфликтом,
+  // если заказ успел измениться.
+  async function orderAction(r: any, action: string, ask: string) {
+    if (!confirm(ask)) return null;
     setBusyId(r.id);
-    const { error: e1 } = await supabase.from('rentals')
-      .update({ status: 'completed', actual_end: new Date().toISOString() })
-      .eq('id', r.id);
-    if (!e1 && r.tools?.cell_id) {
-      await supabase.from('cells').update({ status: 'free' }).eq('id', r.tools.cell_id);
-    }
-    if (e1) alert(`Ошибка: ${e1.message}`);
-    setBusyId(null);
-    loadRentals();
-  }
-
-  // Аннулировать неоплаченный штраф (через бэкенд: уведомление клиенту, снятие блокировки)
-  async function waivePenalty(r: any) {
-    if (!confirm(`Списать штраф ${r.total_price?.toLocaleString()} сўм (${r.users?.phone})? Клиент снова сможет арендовать.`)) return;
-    setBusyId(r.id);
-    const resp = await fetch(`/api/orders/${r.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'waive_penalty' }) });
+    const resp = await fetch(`/api/orders/${r.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    });
     const j = await resp.json().catch(() => ({}));
     if (!resp.ok) alert(`Ошибка: ${j.error || resp.status}`);
     setBusyId(null);
     loadRentals();
+    return resp.ok ? j : null;
   }
 
-  // Отменить неоплаченную аренду. Ячейка не резервируется до оплаты — трогать её не нужно.
+  // Завершить аренду вручную: инструмент принят сотрудником на месте.
+  // Замок из админки не открываем — это делает точка/приложение.
+  async function closeRental(r: any) {
+    const j = await orderAction(r, 'close_rental',
+      `Завершить аренду «${r.tools?.name}» (${r.users?.phone})? Ячейка станет свободной, за просрочку выставится счёт.`);
+    if (j && j.overdue_fee > 0) {
+      alert(`Аренда закрыта. Штраф ${Number(j.overdue_fee).toLocaleString('ru-RU')} сўм`
+        + (j.penalty_order_number ? ` — счёт №${j.penalty_order_number}` : ''));
+    }
+  }
+
+  // Аннулировать неоплаченный штраф: уведомление клиенту, снятие блокировки.
+  async function waivePenalty(r: any) {
+    await orderAction(r, 'waive_penalty',
+      `Списать штраф ${r.total_price?.toLocaleString()} сўм (${r.users?.phone})? Клиент снова сможет арендовать.`);
+  }
+
+  // Отменить неоплаченный заказ: сервер вернёт списанный бонус и известит клиента.
   async function cancelRental(r: any) {
-    if (!confirm(`Отменить неоплаченную аренду «${r.tools?.name}»?`)) return;
-    setBusyId(r.id);
-    const { error: e } = await supabase.from('rentals')
-      .update({ status: 'cancelled' }).eq('id', r.id).eq('status', 'pending_payment');
-    if (e) alert(`Ошибка: ${e.message}`);
-    setBusyId(null);
-    loadRentals();
+    await orderAction(r, 'cancel', `Отменить неоплаченную аренду «${r.tools?.name}»?`);
   }
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="text-gray-400">Загрузка...</div></div>;

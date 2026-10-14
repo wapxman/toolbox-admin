@@ -35,7 +35,22 @@ const ALLOWED_TABLES = new Set([
 // деньги меняет сервер своими проводками.
 const READ_ONLY = new Set(['wallet_entries', 'transactions', 'notifications']);
 
+// Функции, которые админке звать можно. Только считающие: ничего не меняют и
+// секретов не возвращают. Белый список таблиц сам по себе их не пропускал —
+// supabase-js шлёт вызов как POST /rest/v1/rpc/<имя>, и экран «Привлечение»
+// получал 403 при каждом открытии.
+const ALLOWED_RPC = new Set(['acquisition_stats']);
+
 function checkPath(path: string, method: string): string | null {
+  const rpc = /^rest\/v1\/rpc\/([a-z_0-9]+)$/i.exec(path);
+  if (rpc) {
+    const fn = rpc[1].toLowerCase();
+    if (!ALLOWED_RPC.has(fn)) return `Функция «${fn}» недоступна из админки`;
+    // Считающие функции вызываются POST'ом — это запрос, а не запись.
+    if (method !== 'POST' && method !== 'GET') return 'Так эту функцию звать нельзя';
+    return null;
+  }
+
   // Разрешаем только REST к таблицам: /rest/v1/<table>
   const m = /^rest\/v1\/([a-z_0-9]+)$/i.exec(path);
   if (!m) return 'Этот путь недоступен из админки';

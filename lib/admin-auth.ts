@@ -46,13 +46,28 @@ export function verifySession(value: string | undefined, pass: string): boolean 
   return Date.now() - ms < SESSION_DAYS * 24 * 3600 * 1000;
 }
 
+/** Чем подписываем сессию.
+ *
+ *  ⚠️ Подписывали ТОЛЬКО паролем. Но войти можно и вторым способом — ссылкой
+ *  с ADMIN_TOKEN, и в этом режиме ADMIN_PASSWORD пуст: middleware выдавал
+ *  cookie, подписанную пустой строкой, а verifySession такую всегда отвергает.
+ *  Ссылка срабатывала ровно один раз и дальше не работала. Секрет берём из
+ *  того, что задано: сменили пароль или токен — прежние сессии разом отпали.
+ */
+export function sessionSecret(): string {
+  return (process.env.ADMIN_PASSWORD || '').trim() || (process.env.ADMIN_TOKEN || '').trim();
+}
+
 /** Достать и проверить сессию из запроса. */
 export function isAuthorized(req: { cookies: { get(name: string): { value: string } | undefined } }): boolean {
-  const pass = (process.env.ADMIN_PASSWORD || '').trim();
-  // Пароль не задан: локально не запираем себя до настройки env, на проде —
-  // закрываем. Пустая настройка не должна означать «открыто всем».
-  if (!pass) return !process.env.VERCEL;
-  return verifySession(req.cookies.get(COOKIE)?.value, pass);
+  const secret = sessionSecret();
+  // ⚠️ Ничего не задано — решаем по сборке, а не по хостингу. Было
+  // `return !process.env.VERCEL`: админка, поднятая где угодно кроме Vercel,
+  // пускала к прокси базы вообще без пароля, а через него видны телефоны
+  // клиентов, коды из sms_codes и платежи, причём на запись. Где она стоит —
+  // не наше дело; боевая сборка без настроенного доступа обязана молчать.
+  if (!secret) return process.env.NODE_ENV !== 'production';
+  return verifySession(req.cookies.get(COOKIE)?.value, secret);
 }
 
 export const AUTH_COOKIE = COOKIE;

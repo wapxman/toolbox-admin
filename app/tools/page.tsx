@@ -98,9 +98,35 @@ export default function ToolsPage() {
       };
 
       if (editing) {
-        // Редактирование — ячейку не меняем
-        const { error: upErr } = await supabase.from('tools').update(payload).eq('id', editing.id);
+        // Редактирование — ячейку не меняем.
+        //
+        // ⚠️ ОСТАТОК НЕ УХОДИТ ВМЕСТЕ С КАРТОЧКОЙ. Форма открывалась со снимком
+        // остатка и всегда слала его обратно: открыли при 5, за это время
+        // продали одну, сотрудник поправил только описание и сохранил — остаток
+        // снова 5, проданная единица вернулась из воздуха. Остаток меняют
+        // продажи и возвраты, а не сохранение описания.
+        const { sale_stock, ...cardOnly } = payload;
+        const { error: upErr } = await supabase.from('tools').update(cardOnly).eq('id', editing.id);
         if (upErr) throw upErr;
+
+        // Если остаток правили руками — пишем отдельно и только поверх того
+        // значения, которое сотрудник видел. Успели продать — скажем об этом,
+        // а не затрём молча.
+        const was = Math.max(0, parseInt(String(editing.sale_stock ?? 0), 10) || 0);
+        if (sale_stock !== was) {
+          const { data: stockDone, error: stockErr } = await supabase
+            .from('tools')
+            .update({ sale_stock })
+            .eq('id', editing.id)
+            .eq('sale_stock', was)
+            .select('id');
+          if (stockErr) throw stockErr;
+          if (!stockDone || !stockDone.length) {
+            setError(`Остаток не изменён: пока карточка была открыта, он изменился (был ${was}). Откройте её заново.`);
+            setSaving(false);
+            return;
+          }
+        }
       } else {
         // Добавление — нужна ячейка
         if (!form.box_id) { setSaving(false); return setError('Выберите бокс'); }
