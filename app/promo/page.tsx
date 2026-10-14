@@ -19,10 +19,23 @@ type Cfg = {
   max_pay_pct: number;
   expires_days: number;
   spins_per_user: number;
+  /** Сколько всего призов разыгрываем. 0 — без ограничения. */
+  winners_limit: number;
+  /** До какого момента идёт акция (ISO с часовым поясом). Пусто — без срока. */
+  ends_at: string;
   prizes: Prize[];
 };
 
-const EMPTY: Cfg = { enabled: true, max_pay_pct: 50, expires_days: 30, spins_per_user: 1, prizes: [] };
+const EMPTY: Cfg = {
+  enabled: true, max_pay_pct: 50, expires_days: 30, spins_per_user: 1,
+  winners_limit: 1000, ends_at: '2026-12-31T23:59:59+05:00', prizes: [],
+};
+
+/** Ташкентское время для поля даты: в input[type=date] уходит только «ГГГГ-ММ-ДД»,
+ *  а на сервер — конец этих суток по Ташкенту, иначе акция закроется на пять
+ *  часов раньше обещанного. */
+const dateOnly = (iso: string) => (iso || '').slice(0, 10);
+const toEndOfDay = (d: string) => (d ? `${d}T23:59:59+05:00` : '');
 
 export default function PromoPage() {
   const [cfg, setCfg] = useState<Cfg>(EMPTY);
@@ -81,6 +94,11 @@ export default function PromoPage() {
     if (cfg.max_pay_pct < 0 || cfg.max_pay_pct > 100) {
       setMsg({ ok: false, text: 'Потолок должен быть от 0 до 100 %.' });
       return;
+    }
+    // Срок в прошлом закроет акцию немедленно — это почти всегда опечатка в
+    // годе, а не намерение, поэтому спрашиваем, а не делаем молча.
+    if (cfg.enabled && cfg.ends_at && new Date(cfg.ends_at).getTime() < Date.now()) {
+      if (!confirm('Дата окончания уже прошла — акция закроется сразу. Всё равно сохранить?')) return;
     }
     setSaving(true);
     const { error } = await supabase
@@ -154,6 +172,29 @@ export default function PromoPage() {
             <input type="number" min={0} className="input" value={cfg.spins_per_user}
               onChange={(e) => setCfg({ ...cfg, spins_per_user: parseInt(e.target.value) || 0 })} />
             <p className="text-xs text-gray-400 mt-1">Всего за всё время, а не в сутки.</p>
+          </div>
+        </div>
+
+        {/* Эти два условия объявлены людям в правилах акции внутри приложения
+            и требуются магазинами (Apple 5.3.2, Google Play Gamified Loyalty
+            Programs). Меняя их здесь, вы меняете и то, что читает клиент. */}
+        <div className="grid grid-cols-2 gap-4 pt-1">
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">Сколько победителей</label>
+            <input type="number" min={0} className="input" value={cfg.winners_limit}
+              onChange={(e) => setCfg({ ...cfg, winners_limit: parseInt(e.target.value) || 0 })} />
+            <p className="text-xs text-gray-400 mt-1">
+              Разыграно: <b>{spins.length >= 100 ? '100+' : spins.length}</b> из {cfg.winners_limit || '∞'}.
+              Когда призы кончатся, колесо закроется само. 0 — без ограничения.
+            </p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">Акция идёт до</label>
+            <input type="date" className="input" value={dateOnly(cfg.ends_at)}
+              onChange={(e) => setCfg({ ...cfg, ends_at: toEndOfDay(e.target.value) })} />
+            <p className="text-xs text-gray-400 mt-1">
+              Включительно, по ташкентскому времени. После этой даты прокрутка недоступна.
+            </p>
           </div>
         </div>
       </div>
