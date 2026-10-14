@@ -2,16 +2,11 @@
 // Секрет ADMIN_API_SECRET живёт только на сервере админки, в браузер не уходит.
 // Доступ — по той же cookie, что и /api/db (ставится после Basic-входа).
 import { NextRequest } from 'next/server';
-import { createHash } from 'crypto';
+import { isAuthorized } from '../../../../lib/admin-auth';
 
 const BACKEND = (process.env.BACKEND_URL || 'https://toolbox-backend-eight.vercel.app').replace(/\/$/, '');
 
-function isAuthorized(req: NextRequest): boolean {
-  const PASS = (process.env.ADMIN_PASSWORD || '').trim();
-  if (!PASS) return true;
-  const expected = createHash('sha256').update(`taketool:${PASS}`, 'utf8').digest('hex');
-  return req.cookies.get('taketool_admin')?.value === expected;
-}
+
 
 // GET /api/orders/health — публичная самопроверка связки админка → бэкенд.
 // Значение секрета не раскрывает: только «задан ли» и «принимает ли его бэкенд»

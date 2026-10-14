@@ -6,7 +6,7 @@
 // Раньше прокси был открыт всем (исключён из middleware) — любой, кто дотянулся
 // до порта, мог читать/писать всю базу service-ролью.
 import { NextRequest } from 'next/server';
-import { createHash } from 'crypto';
+import { isAuthorized } from '../../../../lib/admin-auth';
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL ||
@@ -20,15 +20,31 @@ const FWD_REQ = ['content-type', 'accept', 'prefer', 'range', 'range-unit'];
 // заголовки ответа, которые нужно вернуть клиенту
 const FWD_RESP = ['content-type', 'content-range', 'range-unit'];
 
-function isAuthorized(req: NextRequest): boolean {
-  const PASS = (process.env.ADMIN_PASSWORD || '').trim();
-  // Пароль не задан: локально не запираем себя до настройки env, а на проде
-  // ЗАКРЫВАЕМ. Этот прокси ходит в базу секретным ключом в обход RLS (телефоны
-  // клиентов, коды sms_codes, платежи — и на запись тоже), поэтому пустой env
-  // не должен означать «открыто всем».
-  if (!PASS) return !process.env.VERCEL;
-  const expected = createHash('sha256').update(`taketool:${PASS}`, 'utf8').digest('hex');
-  return req.cookies.get('taketool_admin')?.value === expected;
+
+
+// ⚠️ БЕЛЫЙ СПИСОК. Прокси пересылал ЛЮБОЙ путь с секретным ключом: из
+// авторизованного браузера можно было вместо штатной кнопки дёрнуть любую
+// таблицу или RPC — бонусы, платежи, sms_codes — и обойти все проверки
+// сервера. Разрешаем ровно то, с чем работает сама админка.
+const ALLOWED_TABLES = new Set([
+  'app_settings', 'boxes', 'cells', 'rentals', 'tools', 'transactions',
+  'users', 'wheel_spins', 'wallet_entries', 'notifications',
+]);
+
+// Таблицы, из которых админке нужно только читать: писать туда руками нечего,
+// деньги меняет сервер своими проводками.
+const READ_ONLY = new Set(['wallet_entries', 'transactions', 'notifications']);
+
+function checkPath(path: string, method: string): string | null {
+  // Разрешаем только REST к таблицам: /rest/v1/<table>
+  const m = /^rest\/v1\/([a-z_0-9]+)$/i.exec(path);
+  if (!m) return 'Этот путь недоступен из админки';
+  const table = m[1].toLowerCase();
+  if (!ALLOWED_TABLES.has(table)) return `Таблица «${table}» недоступна из админки`;
+  if (READ_ONLY.has(table) && method !== 'GET' && method !== 'HEAD') {
+    return `Таблица «${table}» доступна только для чтения`;
+  }
+  return null;
 }
 
 async function proxy(req: NextRequest, ctx: { params: { path: string[] } }) {
@@ -46,6 +62,13 @@ async function proxy(req: NextRequest, ctx: { params: { path: string[] } }) {
   }
 
   const path = (ctx.params.path || []).join('/');
+  const denied = checkPath(path, req.method);
+  if (denied) {
+    return new Response(JSON.stringify({ error: denied }), {
+      status: 403,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
   const target = `${SUPABASE_URL}/${path}${req.nextUrl.search}`;
 
   const headers: Record<string, string> = {

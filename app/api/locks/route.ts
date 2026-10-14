@@ -13,16 +13,11 @@
 // 404 здесь НЕ значит «такого URL нет», и сообщение об ошибке это проговаривает,
 // иначе следующий разбор уйдёт искать опечатку в пути вместо секрета.
 import { NextRequest } from 'next/server';
-import { createHash } from 'crypto';
+import { isAuthorized } from '../../../lib/admin-auth';
 
 const BACKEND = (process.env.BACKEND_URL || 'https://toolbox-backend-eight.vercel.app').replace(/\/$/, '');
 
-function isAuthorized(req: NextRequest): boolean {
-  const PASS = (process.env.ADMIN_PASSWORD || '').trim();
-  if (!PASS) return true;
-  const expected = createHash('sha256').update(`taketool:${PASS}`, 'utf8').digest('hex');
-  return req.cookies.get('taketool_admin')?.value === expected;
-}
+
 
 function explain(status: number, raw: string): string {
   if (status === 404) {

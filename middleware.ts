@@ -15,16 +15,13 @@
 // проде (VERCEL) при незаданных ADMIN_PASSWORD/ADMIN_TOKEN доступ ЗАКРЫВАЕТСЯ,
 // а не открывается: пустой env не должен выставлять базу наружу.
 import { NextRequest, NextResponse } from 'next/server';
+import { issueSession, verifySession, SESSION_DAYS } from './lib/admin-auth';
 
 const AUTH_COOKIE = 'taketool_admin';
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 180; // полгода — чтобы телефон не разлогинивался
+// Срок сессии задаётся в lib/admin-auth: полгода — это не сессия, а пароль
+// на бумажке. Cookie теперь подписана и содержит дату выдачи.
+const COOKIE_MAX_AGE = 60 * 60 * 24 * SESSION_DAYS;
 
-async function sha256Hex(s: string): Promise<string> {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
 
 // Сравнение за постоянное время: обычное === утекает длину общего префикса.
 function safeEqual(a: string, b: string): boolean {
@@ -58,10 +55,8 @@ export async function middleware(req: NextRequest) {
     );
   }
 
-  const expected = await sha256Hex(`taketool:${PASS}`);
-
-  // 1. Уже входили с этого устройства.
-  if (req.cookies.get(AUTH_COOKIE)?.value === expected) return NextResponse.next();
+  // 1. Уже входили с этого устройства — проверяем подпись и срок сессии.
+  if (verifySession(req.cookies.get(AUTH_COOKIE)?.value, PASS)) return NextResponse.next();
 
   // 2. Ссылка-ключ: ?k=<токен> — ставим cookie и убираем токен из адреса,
   //    чтобы он не осел в истории браузера и в заголовке Referer.
@@ -70,7 +65,7 @@ export async function middleware(req: NextRequest) {
     const clean = req.nextUrl.clone();
     clean.searchParams.delete('k');
     const res = NextResponse.redirect(clean);
-    setPass(res, expected);
+    setPass(res, issueSession(PASS));
     return res;
   }
 
@@ -83,7 +78,7 @@ export async function middleware(req: NextRequest) {
       const pass = decoded.slice(i + 1).trim(); // логин игнорируем, берём только пароль
       if (PASS && safeEqual(pass, PASS)) {
         const res = NextResponse.next();
-        setPass(res, expected);
+        setPass(res, issueSession(PASS));
         return res;
       }
     } catch {
