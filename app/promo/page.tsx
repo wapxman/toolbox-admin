@@ -39,14 +39,14 @@ const toEndOfDay = (d: string) => (d ? `${d}T23:59:59+05:00` : '');
 
 
 // Keep the draft text while typing: 0,001 and 0.001 must not become 0.
-export function parseWeight(value: number | string): number | null {
+function parseWeight(value: number | string): number | null {
   const text = String(value).trim().replace(',', '.');
   if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) return null;
   const number = Number(text);
   return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
-export function formatChance(value: number): string {
+function formatChance(value: number): string {
   if (value > 0 && value < 0.000001) return '< 0,000001';
   return value.toLocaleString('ru-RU', { maximumFractionDigits: 6 });
 }
