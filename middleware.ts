@@ -17,7 +17,7 @@
 // именно сборка (NODE_ENV), а не хостинг: раньше условием был Vercel, и та же
 // админка, поднятая в другом месте, пускала к базе без пароля.
 import { NextRequest, NextResponse } from 'next/server';
-import { issueSession, verifySession, SESSION_DAYS, sessionSecret } from './lib/admin-auth';
+import { issueSession, verifySession, SESSION_DAYS, sessionSecret } from './lib/admin-auth-edge';
 
 const AUTH_COOKIE = 'taketool_admin';
 // Срок сессии задаётся в lib/admin-auth: полгода — это не сессия, а пароль
@@ -63,7 +63,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // 1. Уже входили с этого устройства — проверяем подпись и срок сессии.
-  if (verifySession(req.cookies.get(AUTH_COOKIE)?.value, SECRET)) return NextResponse.next();
+  if (await verifySession(req.cookies.get(AUTH_COOKIE)?.value, SECRET)) return NextResponse.next();
 
   // 2. Ссылка-ключ: ?k=<токен> — ставим cookie и убираем токен из адреса,
   //    чтобы он не осел в истории браузера и в заголовке Referer.
@@ -72,7 +72,7 @@ export async function middleware(req: NextRequest) {
     const clean = req.nextUrl.clone();
     clean.searchParams.delete('k');
     const res = NextResponse.redirect(clean);
-    setPass(res, issueSession(SECRET));
+    setPass(res, await issueSession(SECRET));
     return res;
   }
 
@@ -85,7 +85,7 @@ export async function middleware(req: NextRequest) {
       const pass = decoded.slice(i + 1).trim(); // логин игнорируем, берём только пароль
       if (PASS && safeEqual(pass, PASS)) {
         const res = NextResponse.next();
-        setPass(res, issueSession(SECRET));
+        setPass(res, await issueSession(SECRET));
         return res;
       }
     } catch {
@@ -102,3 +102,4 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico|api/).*)'],
 };
+
