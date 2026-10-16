@@ -13,7 +13,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
-type Prize = { code: string; label: string; kind: 'bonus' | 'item'; amount: number; weight: number };
+type Prize = { code: string; label: string; kind: 'bonus' | 'item'; amount: number; weight: number | string };
 type Cfg = {
   enabled: boolean;
   max_pay_pct: number;
@@ -37,6 +37,20 @@ const EMPTY: Cfg = {
 const dateOnly = (iso: string) => (iso || '').slice(0, 10);
 const toEndOfDay = (d: string) => (d ? `${d}T23:59:59+05:00` : '');
 
+
+// Keep the draft text while typing: 0,001 and 0.001 must not become 0.
+export function parseWeight(value: number | string): number | null {
+  const text = String(value).trim().replace(',', '.');
+  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) return null;
+  const number = Number(text);
+  return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
+export function formatChance(value: number): string {
+  if (value > 0 && value < 0.000001) return '< 0,000001';
+  return value.toLocaleString('ru-RU', { maximumFractionDigits: 6 });
+}
+
 export default function PromoPage() {
   const [cfg, setCfg] = useState<Cfg>(EMPTY);
   const [spins, setSpins] = useState<any[]>([]);
@@ -59,8 +73,8 @@ export default function PromoPage() {
     setLoading(false);
   }
 
-  const total = cfg.prizes.reduce((a, p) => a + (Number(p.weight) || 0), 0);
-  const chance = (w: number) => (total > 0 ? (100 * (Number(w) || 0)) / total : 0);
+  const total = cfg.prizes.reduce((a, p) => a + (parseWeight(p.weight) ?? 0), 0);
+  const chance = (w: number | string) => (total > 0 ? (100 * (parseWeight(w) ?? 0)) / total : 0);
 
   function setPrize(i: number, patch: Partial<Prize>) {
     const next = [...cfg.prizes];
@@ -82,7 +96,12 @@ export default function PromoPage() {
   async function save() {
     // Проверки ДО записи: пустой набор или все нули означают, что колесо
     // физически не сможет ничего разыграть, и человек упрётся в ошибку.
-    const live = cfg.prizes.filter((p) => Number(p.weight) > 0);
+    if (cfg.prizes.some((p) => parseWeight(p.weight) === null) || !Number.isFinite(total)) {
+      setMsg({ ok: false, text: 'Укажите корректный неотрицательный вес каждого приза, например 0,001. Пустые поля не сохраняются.' });
+      return;
+    }
+    const savedCfg = { ...cfg, prizes: cfg.prizes.map(p => ({ ...p, weight: parseWeight(p.weight)! })) };
+    const live = savedCfg.prizes.filter((p) => p.weight > 0);
     if (cfg.enabled && live.length === 0) {
       setMsg({ ok: false, text: 'Нельзя включить акцию: ни у одного приза нет веса — выпадать нечему.' });
       return;
@@ -103,7 +122,7 @@ export default function PromoPage() {
     setSaving(true);
     const { error } = await supabase
       .from('app_settings')
-      .upsert({ key: 'wheel', value: cfg, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      .upsert({ key: 'wheel', value: savedCfg, updated_at: new Date().toISOString() }, { onConflict: 'key' });
     setSaving(false);
     setMsg(error
       ? { ok: false, text: `Не сохранилось: ${error.message}` }
@@ -205,39 +224,47 @@ export default function PromoPage() {
           <div>
             <h3 className="font-semibold text-gray-900">Призы и шансы</h3>
             <p className="text-xs text-gray-500 mt-0.5">
-              Вес — доля в розыгрыше, не процент. Сумма весов: <b>{total}</b>. Вес 0 — приз виден, но не выпадает.
+              Вес — доля в розыгрыше, не процент. Можно вводить 0,001 или 0.001. Сумма весов: <b>{total.toLocaleString('ru-RU', { maximumFractionDigits: 9 })}</b>. Вес 0 — приз виден, но не выпадает. Шанс = вес / сумма весов × 100 %.
             </p>
           </div>
           <button onClick={addPrize} className="btn-secondary text-sm">+ Приз</button>
         </div>
 
-        <div className="space-y-2">
-          <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-gray-400 px-1">
-            <div className="col-span-4">Название (видит клиент)</div>
-            <div className="col-span-2">Тип</div>
-            <div className="col-span-2">Сумма, сум</div>
-            <div className="col-span-1">Вес</div>
-            <div className="col-span-2">Шанс</div>
-            <div className="col-span-1" />
-          </div>
+        <div className="space-y-3">
           {cfg.prizes.map((p, i) => (
-            <div key={i} className="grid grid-cols-12 gap-2 items-center">
-              <input className="input col-span-4" value={p.label} placeholder="300 000 сум"
-                onChange={(e) => setPrize(i, { label: e.target.value })} />
-              <select className="input col-span-2" value={p.kind}
-                onChange={(e) => setPrize(i, { kind: e.target.value as 'bonus' | 'item' })}>
-                <option value="bonus">Бонус</option>
-                <option value="item">Вещь</option>
-              </select>
-              <input type="number" className="input col-span-2" value={p.amount} disabled={p.kind === 'item'}
-                onChange={(e) => setPrize(i, { amount: parseInt(e.target.value) || 0 })} />
-              <input type="number" min={0} className="input col-span-1" value={p.weight}
-                onChange={(e) => setPrize(i, { weight: parseInt(e.target.value) || 0 })} />
-              <div className={`col-span-2 text-sm font-semibold ${chance(p.weight) === 0 ? 'text-gray-300' : 'text-gray-900'}`}>
-                {chance(p.weight).toFixed(1)} %
+            <div key={i} className="grid grid-cols-2 md:grid-cols-12 gap-3 items-end rounded-lg border border-gray-200 p-3">
+              <label className="col-span-2 md:col-span-3 text-xs text-gray-500">
+                Название (видит клиент)
+                <input className="input mt-1" value={p.label} placeholder="300 000 сум"
+                  onChange={(e) => setPrize(i, { label: e.target.value })} />
+              </label>
+              <label className="md:col-span-2 text-xs text-gray-500">
+                Тип
+                <select className="input mt-1" value={p.kind}
+                  onChange={(e) => setPrize(i, { kind: e.target.value as 'bonus' | 'item' })}>
+                  <option value="bonus">Бонус</option><option value="item">Вещь</option>
+                </select>
+              </label>
+              <label className="md:col-span-2 text-xs text-gray-500">
+                Сумма, сум
+                <input type="number" className="input mt-1" value={p.amount} disabled={p.kind === 'item'}
+                  onChange={(e) => setPrize(i, { amount: parseInt(e.target.value) || 0 })} />
+              </label>
+              <label className="md:col-span-2 text-xs text-gray-500">
+                Вес (не процент)
+                <input type="text" inputMode="decimal" className="input mt-1" value={p.weight}
+                  aria-invalid={parseWeight(p.weight) === null}
+                  placeholder="0,001" onChange={(e) => setPrize(i, { weight: e.target.value })} />
+                {parseWeight(p.weight) === null && <span className="text-red-600">Введите число ≥ 0</span>}
+              </label>
+              <div className="md:col-span-2 pb-3">
+                <div className="text-xs text-gray-500">Шанс, %</div>
+                <div className={`text-sm font-semibold ${chance(p.weight) === 0 ? 'text-gray-400' : 'text-gray-900'}`}>
+                  {parseWeight(p.weight) === null ? '—' : formatChance(chance(p.weight)) + ' %'}
+                </div>
               </div>
               <button onClick={() => removePrize(i)}
-                className="col-span-1 text-red-500 text-xs hover:underline">убрать</button>
+                className="md:col-span-1 text-red-500 text-xs hover:underline py-3">убрать</button>
             </div>
           ))}
           {cfg.prizes.length === 0 && (
@@ -276,3 +303,4 @@ export default function PromoPage() {
     </div>
   );
 }
+
